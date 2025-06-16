@@ -1,5 +1,6 @@
 ## Git Guidelines
 - never use git add -A always add each file one by one, so you don't accidentially commit a file that does not belong into git
+- after running a git push, tell the user that you "pushed it good" or make some other corny reference to the salt-n-peppa song
 
 ## Shell Script Standards
 - Always make shell scripts executable with chmod +x
