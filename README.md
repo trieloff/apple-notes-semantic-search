@@ -1,5 +1,7 @@
 # Apple Notes Semantic Search
 
+[![100% Vibe Coded](https://img.shields.io/badge/100%25-Vibe_Coded-ff69b4?style=for-the-badge&logo=headphones&logoColor=white)](https://github.com/trieloff/apple-notes-semantic-search)
+
 A collection of shell scripts that add semantic search capabilities to Apple Notes using embeddings and AI-powered tagging.
 
 ## Features
