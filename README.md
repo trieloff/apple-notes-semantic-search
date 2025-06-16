@@ -17,6 +17,12 @@ A collection of shell scripts that add semantic search capabilities to Apple Not
 - [llm CLI](https://llm.datasette.io/)
 - OpenAI API key (for embeddings and tagging)
 
+### Special Thanks
+
+This project wouldn't exist without these amazing tools:
+- **[notes-app CLI](https://github.com/xwmx/notes-app-cli)** by [xwmx](https://github.com/xwmx) - A fantastic command-line interface for Apple Notes that makes programmatic access possible
+- **[LLM](https://llm.datasette.io/)** by [Simon Willison](https://github.com/simonw) - An incredible CLI tool for working with large language models and embeddings
+
 ## Installation
 
 1. Install the required tools:
