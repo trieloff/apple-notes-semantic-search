@@ -13,12 +13,14 @@ A collection of shell scripts that add semantic search capabilities to Apple Not
 - 🔄 **Incremental Updates**: Efficient indexing with `--continue` flag
 - 🔒 **Privacy-First**: Local inference with MLX models - no API calls required
 - 🚀 **Apple Silicon Optimized**: Leverages MLX framework for fast local AI
+- 🖧 **MCP Server**: Expose add/search via JSON-RPC for MCP clients
 
 ## Prerequisites
 
 - macOS with Apple Notes
 - [notes-app CLI](https://github.com/xwmx/notes-app-cli)
 - [llm CLI](https://llm.datasette.io/) with plugins
+- [jq](https://stedolan.github.io/jq/) for JSON parsing
 - Python environment (for local models)
 
 ### Special Thanks
@@ -34,6 +36,9 @@ This project wouldn't exist without these amazing tools:
 ```bash
 # Install notes-app CLI
 brew install xwmx/taps/notes-app
+
+# Install jq for JSON handling
+brew install jq
 
 # Install llm CLI (via uv for isolation)
 uv tool install llm
@@ -171,6 +176,21 @@ Weekend plans for the family
 - Local models provide privacy and work offline
 - MLX models are optimized for Apple Silicon performance
 - The system supports both local and cloud models via configuration
+## MCP Server Setup
+
+This repository also includes `memories-mcp.sh`, a JSON-RPC server implementing the [MCP protocol](https://github.com/mcp-protocol/spec). It exposes `add` and `search` tools so editors can interact with your notes. Start the server from the repo directory:
+```bash
+./memories-mcp.sh
+```
+Logs are written to `/tmp/memories-mcp-requests.log`.
+
+### Client Setup
+- **Claude Desktop**: Add a custom MCP server and point it to the `memories-mcp.sh` script.
+- **Claude Code**: Use the MCP settings to register `./memories-mcp.sh` as a server.
+- **Zed**: In Preferences → AI, enable a custom MCP server and specify the script path.
+- **Cursor**: Configure the MCP command to run `memories-mcp.sh`.
+- **GitHub Co-Pilot**: Enable the experimental MCP endpoint and set it to `./memories-mcp.sh`.
+
 
 ## Troubleshooting
 

@@ -36,6 +36,12 @@ check_required_tools() {
         echo "Error: notes-app command not found. Please install it first."
         exit 1
     fi
+
+    # jq is used for JSON parsing across several scripts
+    if ! command -v jq &> /dev/null; then
+        echo "Error: jq command not found. Please install it first."
+        exit 1
+    fi
 }
 
 # Function to set up API keys from config
