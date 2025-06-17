@@ -92,7 +92,10 @@ if [[ -z "$NOTES_NAMES" ]]; then
 fi
 
 # Process each note by name
-echo "$NOTES_NAMES" | while IFS= read -r note_name; do
+CONSECUTIVE_SKIPPED=0
+MAX_CONSECUTIVE_SKIPS=5  # Terminate early after 5 consecutive unchanged notes
+
+while IFS= read -r note_name; do
     # Skip empty lines
     if [[ -z "$note_name" ]]; then
         continue
@@ -118,7 +121,17 @@ echo "$NOTES_NAMES" | while IFS= read -r note_name; do
     if [[ "$CONTINUE_MODE" == true ]] && [[ -n "$note_date" ]] && [[ -n "$LAST_RUN" ]]; then
         if ! is_note_newer "$note_date" "$LAST_RUN"; then
             echo "Skipping unchanged note: $note_name"
+            CONSECUTIVE_SKIPPED=$((CONSECUTIVE_SKIPPED + 1))
+            
+            # Early termination if we've hit several consecutive unchanged notes
+            if [[ $CONSECUTIVE_SKIPPED -ge $MAX_CONSECUTIVE_SKIPS ]]; then
+                echo "Reached $MAX_CONSECUTIVE_SKIPS consecutive unchanged notes, terminating early for efficiency"
+                break
+            fi
             continue
+        else
+            # Reset counter when we find a newer note
+            CONSECUTIVE_SKIPPED=0
         fi
     fi
     
@@ -140,7 +153,8 @@ $note_content"
         2>/dev/null || echo "Warning: Failed to embed note '$note_name'"
     
     echo "Embedded note: $note_name"
-done
+    CONSECUTIVE_SKIPPED=0  # Reset counter when successfully processing a note
+done <<< "$NOTES_NAMES"
 
 # Save current timestamp
 save_timestamp

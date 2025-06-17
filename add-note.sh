@@ -99,16 +99,17 @@ add_to_notes() {
     notes-app add "$title" --folder "$FOLDER_NAME" --body "$content" 2>/dev/null
 }
 
-# Function to trigger reindex
+# Function to trigger reindex in background
 trigger_reindex() {
     local index_script="$SCRIPT_DIR/index-notes.sh"
     
     if [[ -x "$index_script" ]]; then
-        echo "Triggering reindex..."
-        # Run indexing synchronously to ensure it completes
-        sleep 1  # Small delay to ensure note is saved
-        "$index_script" --continue
-        echo "Reindex completed."
+        echo "Triggering background reindex..."
+        # Run indexing in background using nohup to ensure it continues even if parent terminates
+        # Redirect output to avoid blocking and ensure process doesn't hang
+        (sleep 1 && "$index_script" --continue > /dev/null 2>&1) &
+        disown
+        echo "Background reindex started."
     else
         echo "Warning: index-notes.sh not found or not executable. Skipping reindex."
     fi
