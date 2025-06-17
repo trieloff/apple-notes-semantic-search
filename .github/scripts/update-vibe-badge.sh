@@ -116,7 +116,7 @@ if [ "$CURSOR_COUNT" -gt "$MAX_COUNT" ]; then
 fi
 if [ "$ZED_COUNT" -gt "$MAX_COUNT" ]; then
   MAX_COUNT="$ZED_COUNT"
-  LOGO="githubcopilot"
+  LOGO="zedindustries"
 fi
 if [ "$OPENAI_COUNT" -gt "$MAX_COUNT" ]; then
   MAX_COUNT="$OPENAI_COUNT"
@@ -124,7 +124,7 @@ if [ "$OPENAI_COUNT" -gt "$MAX_COUNT" ]; then
 fi
 if [ "$BOT_COUNT" -gt "$MAX_COUNT" ]; then
   MAX_COUNT="$BOT_COUNT"
-  LOGO="githubcopilot"
+  LOGO="githubactions"
 fi
 
 # Display debug output
