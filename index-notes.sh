@@ -130,11 +130,12 @@ $note_content"
     
     # Store in LLM embeddings with metadata
     embedding_model=$(get_embedding_model)
+    metadata=$(jq -cn --arg title "$note_name" --arg date "$note_date" --arg folder "$FOLDER_NAME" '{title:$title, date:$date, folder:$folder}')
     echo "$combined_text" | $LLM_CMD embed \
         -m "$embedding_model" \
         "$COLLECTION_NAME" \
         "$note_id" \
-        --metadata "{\"title\":\"$note_name\",\"date\":\"$note_date\",\"folder\":\"$FOLDER_NAME\"}" \
+        --metadata "$metadata" \
         --store \
         2>/dev/null || echo "Warning: Failed to embed note '$note_name'"
     
