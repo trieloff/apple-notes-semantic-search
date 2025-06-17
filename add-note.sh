@@ -147,9 +147,32 @@ fi
 
 echo "Processing note content..."
 
-# Generate tags using LLM
-echo "Generating tags..."
-TAGS=$(generate_tags "$NOTE_CONTENT")
+# Generate tags and title in parallel using LLM
+echo "Generating tags and title in parallel..."
+
+# Start both LLM calls in background
+{
+    TAGS=$(generate_tags "$NOTE_CONTENT")
+    echo "$TAGS" > /tmp/note_tags_$$
+} &
+TAGS_PID=$!
+
+{
+    NOTE_TITLE=$(generate_title "$NOTE_CONTENT")
+    echo "$NOTE_TITLE" > /tmp/note_title_$$
+} &
+TITLE_PID=$!
+
+# Wait for both processes to complete
+wait $TAGS_PID
+wait $TITLE_PID
+
+# Read results from temp files
+TAGS=$(cat /tmp/note_tags_$$ 2>/dev/null || echo "")
+NOTE_TITLE=$(cat /tmp/note_title_$$ 2>/dev/null || echo "")
+
+# Clean up temp files
+rm -f /tmp/note_tags_$$ /tmp/note_title_$$
 
 if [[ -z "$TAGS" ]]; then
     echo "Warning: No tags generated. Proceeding without tags."
@@ -160,10 +183,7 @@ fi
 TAGS=$(echo "$TAGS" | xargs)
 
 echo "Generated tags: $TAGS"
-
-# Generate a concise title using LLM
-echo "Generating title..."
-NOTE_TITLE=$(generate_title "$NOTE_CONTENT")
+echo "Generated title: $NOTE_TITLE"
 
 # For single-line notes, use the content as body too
 # For multi-line notes, everything after the first line is body
