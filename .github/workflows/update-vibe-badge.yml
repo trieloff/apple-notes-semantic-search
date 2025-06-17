@@ -18,7 +18,7 @@ jobs:
           fetch-depth: 0
       - name: Update badge
         run: |
-          bash scripts/update-vibe-badge.sh
+          bash .github/scripts/update-vibe-badge.sh
       - name: Push changes
         run: |
           if [ -f /tmp/badge_changed ]; then
