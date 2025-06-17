@@ -22,6 +22,7 @@ CURSOR_COUNT=0
 ZED_COUNT=0
 OPENAI_COUNT=0
 BOT_COUNT=0
+RENOVATE_COUNT=0
 
 for COMMIT in $(git rev-list HEAD); do
   AUTHOR="$(git show -s --format='%an <%ae>' "$COMMIT")"
@@ -35,8 +36,13 @@ for COMMIT in $(git rev-list HEAD); do
   # Check if commit is on a codex branch
   BRANCHES="$(git branch --contains "$COMMIT" --all 2>/dev/null | grep -E 'remotes/origin/.*codex/' || true)"
   
-  # Check for bot commits
-  if echo "$AUTHOR" | grep -F '[bot]' >/dev/null; then
+  # Check for Renovate bot commits
+  if echo "$AUTHOR" | grep -F 'renovate[bot]' >/dev/null; then
+    VIBE=$((VIBE + 1))
+    IS_AI=true
+    AI_TYPE="Renovate"
+  # Check for other bot commits
+  elif echo "$AUTHOR" | grep -F '[bot]' >/dev/null; then
     VIBE=$((VIBE + 1))
     IS_AI=true
     AI_TYPE="Bot"
@@ -75,6 +81,7 @@ for COMMIT in $(git rev-list HEAD); do
       "Zed") ZED_COUNT=$((ZED_COUNT + 1)) ;;
       "OpenAI") OPENAI_COUNT=$((OPENAI_COUNT + 1)) ;;
       "Bot") BOT_COUNT=$((BOT_COUNT + 1)) ;;
+      "Renovate") RENOVATE_COUNT=$((RENOVATE_COUNT + 1)) ;;
     esac
   fi
   
@@ -126,6 +133,10 @@ if [ "$BOT_COUNT" -gt "$MAX_COUNT" ]; then
   MAX_COUNT="$BOT_COUNT"
   LOGO="githubactions"
 fi
+if [ "$RENOVATE_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$RENOVATE_COUNT"
+  LOGO="renovatebot"
+fi
 
 # Display debug output
 if $DEBUG; then
@@ -143,6 +154,7 @@ if $DEBUG; then
   [ "$ZED_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Zed" "$ZED_COUNT"
   [ "$OPENAI_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "OpenAI" "$OPENAI_COUNT"
   [ "$BOT_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Bot" "$BOT_COUNT"
+  [ "$RENOVATE_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Renovate" "$RENOVATE_COUNT"
   echo ""
   echo "Selected logo: $LOGO"
   echo ""
