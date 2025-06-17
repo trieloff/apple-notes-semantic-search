@@ -46,16 +46,16 @@ check_required_tools() {
 
 # Function to set up API keys from config
 setup_api_keys() {
-    if [[ -n "$OPENAI_API_KEY" ]]; then
+    if [[ -n "${OPENAI_API_KEY:-}" ]]; then
         export OPENAI_API_KEY
     fi
     
-    if [[ -n "$ANTHROPIC_API_KEY" ]]; then
+    if [[ -n "${ANTHROPIC_API_KEY:-}" ]]; then
         export ANTHROPIC_API_KEY
     fi
     
     # Add support for other API keys as needed
-    if [[ -n "$GEMINI_API_KEY" ]]; then
+    if [[ -n "${GEMINI_API_KEY:-}" ]]; then
         export GEMINI_API_KEY
     fi
 }

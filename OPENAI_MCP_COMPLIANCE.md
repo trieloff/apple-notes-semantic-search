@@ -195,6 +195,55 @@ OpenAI connects with:
 - [MCP Server Setup Guide](https://community.openai.com/t/how-to-set-up-a-remote-mcp-server-and-connect-it-to-chatgpt-deep-research/1278375)
 - [MCP Specification](https://spec.modelcontextprotocol.io/)
 
+## Cross-Client Compatibility: ChatGPT vs Claude
+
+A key challenge when building MCP servers is achieving compatibility across different AI clients that have varying expectations for response formats.
+
+### The Problem
+
+Different MCP clients expect different response formats:
+
+- **ChatGPT Deep Research**: Expects `results` array with structured objects (`id`, `title`, `text`, `url`)
+- **Claude**: Expects `content` array with text objects for LLM consumption (`type: "text"`, `text: "...")
+
+### The Solution: Dual Format Response
+
+To achieve maximum compatibility, return both formats in your tool responses:
+
+```json
+{
+  "content": [
+    {
+      "type": "text", 
+      "text": "Title: Example\nURL: x-coredata://...\n\nContent here..."
+    }
+  ],
+  "results": [
+    {
+      "id": "x-coredata://...",
+      "title": "Example",
+      "text": "Content here...",
+      "url": "x-coredata://..."
+    }
+  ]
+}
+```
+
+### Implementation Notes
+
+1. **Search Tool**: Return both `content` (for Claude) and `results` (for ChatGPT)
+2. **Fetch Tool**: Return both formats for consistency
+3. **URL Field**: Use core data IDs as URLs since they're already URL-like (`x-coredata://...`)
+4. **Content Text**: Include URLs in the text so Claude knows what to pass to fetch
+
+### Benefits
+
+- **Universal compatibility**: Works with both ChatGPT and Claude
+- **Standards compliance**: Follows both MCP spec and ChatGPT requirements
+- **Future-proof**: Ready for other MCP clients with different expectations
+
+This dual-format approach ensures your MCP server works seamlessly across all major AI platforms without requiring client-specific code branches.
+
 ## Success Indicators
 
 When your server is compliant, you'll see in logs:

@@ -46,10 +46,10 @@ success_response() {
     local id="$1"
     local result="$2"
     local response
-    response=$(jq -cn --argjson id "$id" --argjson result "$result" '{
+    response=$(jq -cn --argjson id "$id" --arg result "$result" '{
         jsonrpc: "2.0",
         id: $id,
-        result: $result
+        result: ($result | fromjson)
     }')
     send_response "$response"
 }
@@ -85,7 +85,12 @@ search_memories() {
     local limit="${2:-10}"
     
     # Load common functions to get COLLECTION_NAME and LLM_CMD
+    if [[ ! -f "$SCRIPT_DIR/common.sh" ]]; then
+        echo "Error: Cannot find common.sh at $SCRIPT_DIR/common.sh" >&2
+        return 1
+    fi
     source "$SCRIPT_DIR/common.sh"
+    init_common
     
     # Call llm similar directly to get JSON results
     local search_results
@@ -117,72 +122,53 @@ search_memories() {
             results_array=$(echo "$results_array" | jq --arg id "$note_id" --arg title "$title" --arg date "$date" --arg score "$score" --arg content "$clean_content" '. += [{"id": $id, "title": $title, "date": $date, "score": $score, "content": $content}]')
         done <<< "$search_results"
         
-        jq -cn --argjson results "$results_array" '{"success": true, "results": $results}'
+        # Format response for both Claude (content) and ChatGPT (results) compatibility
+        local content_text=$(echo "$results_array" | jq -r 'map("Title: \(.title)\nURL: \(.id)\nScore: \(.score)\n\(.content)\n\nTo get the full note details, use the fetch tool with the URL: \(.id)") | join("\n---\n")')
+        # Transform results array to match ChatGPT schema (id, title, text, url) - use ID as URL for fetch
+        local chatgpt_results=$(echo "$results_array" | jq 'map({id: .id, title: .title, text: .content, url: .id})')
+        jq -cn --argjson results "$chatgpt_results" --arg text "$content_text" '{"content": [{"type": "text", "text": $text}], "results": $results}'
     else
-        jq -cn --arg query "$query" '{"error": "Search failed or no results found", "query": $query}'
+        jq -cn --arg query "$query" '{"isError": true, "content": [{"type": "text", "text": ("Search failed or no results found for query: " + $query)}]}'
         return 1
     fi
 }
 
-# Fetch specific memory by ID
+# Fetch specific memory by URL (core data ID)
 fetch_memory() {
-    local note_id="$1"
+    local note_url="$1"
     
-    # Load common functions to get COLLECTION_NAME and LLM_CMD
-    source "$SCRIPT_DIR/common.sh"
-    
-    # Call llm similar to find the specific note by ID
-    local search_results
-    search_results=$($LLM_CMD similar "$COLLECTION_NAME" -c "$note_id" -n 50 2>/dev/null || echo "")
-    
-    if [[ -z "$search_results" ]]; then
-        jq -cn --arg id "$note_id" '{"error": "Note not found", "id": $id}'
+    # Check if required tools are available
+    if ! command -v notes-app &> /dev/null; then
+        jq -cn --arg url "$note_url" '{"isError": true, "content": [{"type": "text", "text": "notes-app command not found"}]}'
         return 1
     fi
     
-    # Find exact ID match
-    local found_note=""
-    while IFS= read -r result_json; do
-        [[ -z "$result_json" ]] && continue
-        
-        local current_id
-        current_id=$(echo "$result_json" | jq -r '.id // ""')
-        
-        if [[ "$current_id" == "$note_id" ]]; then
-            found_note="$result_json"
-            break
-        fi
-    done <<< "$search_results"
+    # Use notes-app to fetch the note directly by core data ID
+    local note_output
+    note_output=$(notes-app show "$note_url" --properties all 2>&1)
+    local exit_code=$?
     
-    if [[ -z "$found_note" ]]; then
-        jq -cn --arg id "$note_id" '{"error": "Note not found", "id": $id}'
+    if [[ $exit_code -ne 0 ]]; then
+        # Note not found or error occurred
+        jq -cn --arg url "$note_url" '{"isError": true, "content": [{"type": "text", "text": ("Note not found with URL: " + $url)}]}'
         return 1
     fi
     
-    # Extract full note details
-    local content title date score
-    content=$(echo "$found_note" | jq -r '.content // "No content"')
-    title=$(echo "$found_note" | jq -r '.metadata.title // "Untitled"')
-    date=$(echo "$found_note" | jq -r '.metadata.date // "Unknown date"')
-    score=$(echo "$found_note" | jq -r '.score // "N/A"')
+    # Parse the notes-app output (format: id, folder, passwordProtected, creationDate, modificationDate, name, body)
+    local lines=()
+    while IFS= read -r line; do
+        lines+=("$line")
+    done <<< "$note_output"
     
-    # Clean content (remove Title: ... Content: prefix if present)
-    local clean_content
-    clean_content=$(echo "$content" | sed -n '/Content:/,$p' | sed '1d')
-    if [[ -z "$clean_content" ]]; then
-        clean_content="$content"
-    fi
+    local note_id="${lines[0]:-}"
+    local creation_date="${lines[3]:-}"
+    local modification_date="${lines[4]:-}"
+    local title="${lines[5]:-Untitled}"
+    local body="${lines[6]:-}"
     
-    jq -cn --arg id "$note_id" --arg title "$title" --arg date "$date" --arg content "$clean_content" --arg score "$score" '{
-        "success": true,
-        "note": {
-            "id": $id,
-            "title": $title,
-            "date": $date,
-            "content": $content,
-            "score": $score
-        }
-    }'
+    # Format response for both Claude (content) and ChatGPT (results) compatibility
+    local content_text="Title: $title\nCreated: $creation_date\nModified: $modification_date\n\n$body"
+    jq -cn --arg id "$note_id" --arg title "$title" --arg text "$body" --arg content_text "$content_text" --arg url "$note_url" '{"content": [{"type": "text", "text": $content_text}], "id": $id, "title": $title, "text": $text, "url": $url}'
 }
 
 # Initialize response
@@ -261,6 +247,17 @@ handle_tools_list() {
             outputSchema: {
                 type: "object",
                 properties: {
+                    content: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                type: { type: "string", enum: ["text"] },
+                                text: { type: "string" }
+                            },
+                            required: ["type", "text"]
+                        }
+                    },
                     results: {
                         type: "array",
                         items: {
@@ -275,40 +272,46 @@ handle_tools_list() {
                         }
                     }
                 },
-                required: ["results"]
+                required: ["content", "results"]
             }
         },
         {
             name: "fetch",
-            description: "Fetches a specific memory by ID and returns its full content",
+            description: "Fetches a specific memory by URL and returns its full content. Use the exact URL from search results.",
             inputSchema: {
                 type: "object",
                 properties: {
+                    url: {
+                        type: "string",
+                        description: "The core data URL of the memory to fetch (e.g., 'x-coredata://...')"
+                    },
                     id: {
                         type: "string",
-                        description: "The unique identifier of the memory to fetch"
+                        description: "Backward compatibility: The unique identifier of the memory to fetch"
                     }
                 },
-                required: ["id"]
+                required: ["url"]
             },
             outputSchema: {
                 type: "object",
                 properties: {
-                    results: {
+                    content: {
                         type: "array",
                         items: {
                             type: "object",
                             properties: {
-                                id: { type: "string", description: "ID of the memory note." },
-                                title: { type: "string", description: "Title of the memory note." },
-                                text: { type: "string", description: "Full content of the memory note." },
-                                url: { type: ["string", "null"], description: "URL reference (always null for local notes)." }
+                                type: { type: "string", enum: ["text"] },
+                                text: { type: "string" }
                             },
-                            required: ["id", "title", "text"]
+                            required: ["type", "text"]
                         }
-                    }
+                    },
+                    id: { type: "string", description: "ID of the memory note." },
+                    title: { type: "string", description: "Title of the memory note." },
+                    text: { type: "string", description: "Full content of the memory note." },
+                    url: { type: ["string", "null"], description: "URL reference (always null for local notes)." }
                 },
-                required: ["results"]
+                required: ["content", "id", "title", "text"]
             }
         }
     ]')
@@ -387,70 +390,30 @@ handle_tools_call() {
             local exit_code=$?
             
             if [[ $exit_code -eq 0 ]]; then
-                # Parse success response and transform to required format
-                local search_results
-                search_results=$(echo "$result" | jq -r '.results')
-                
-                # Transform results to match OpenAI schema (id, title, text, url)
-                local transformed_results
-                transformed_results=$(echo "$search_results" | jq 'map({
-                    id: .id,
-                    title: .title,
-                    text: .content,
-                    url: null
-                })')
-                
-                local mcp_result
-                mcp_result=$(jq -cn --argjson results "$transformed_results" '{
-                    results: $results
-                }')
-                success_response "$id" "$mcp_result"
+                # Use the dual-format response directly from search_memories
+                success_response "$id" "$result"
             else
-                # Parse error response
-                local error_msg
-                error_msg=$(echo "$result" | jq -r '.error // "Search failed"')
-                error_response "$id" -32603 "$error_msg"
+                # Since search_memories now returns MCP format errors, handle as MCP response
+                success_response "$id" "$result"
             fi
             ;;
             
         "fetch")
-            local fetch_id
-            fetch_id=$(echo "$arguments" | jq -r '.id // empty')
+            local fetch_url
+            # Try both 'url' (ChatGPT standard) and 'id' (backward compatibility) parameters
+            fetch_url=$(echo "$arguments" | jq -r '.url // .id // empty')
             
-            if [[ -z "$fetch_id" ]]; then
-                error_response "$id" -32602 "Missing required parameter: id"
+            if [[ -z "$fetch_url" ]]; then
+                error_response "$id" -32602 "Missing required parameter: url or id"
                 return
             fi
             
             local result
-            result=$(fetch_memory "$fetch_id")
+            result=$(fetch_memory "$fetch_url")
             local exit_code=$?
             
-            if [[ $exit_code -eq 0 ]]; then
-                # Parse success response and transform to required format
-                local note_data
-                note_data=$(echo "$result" | jq -r '.note')
-                
-                # Transform to match OpenAI schema (return as single-item array)
-                local transformed_result
-                transformed_result=$(echo "$note_data" | jq '{
-                    id: .id,
-                    title: .title, 
-                    text: .content,
-                    url: null
-                }')
-                
-                local mcp_result
-                mcp_result=$(jq -cn --argjson result "$transformed_result" '{
-                    results: [$result]
-                }')
-                success_response "$id" "$mcp_result"
-            else
-                # Parse error response
-                local error_msg
-                error_msg=$(echo "$result" | jq -r '.error // "Fetch failed"')
-                error_response "$id" -32603 "$error_msg"
-            fi
+            # Always use success_response since fetch_memory returns MCP format
+            success_response "$id" "$result"
             ;;
             
         *)
