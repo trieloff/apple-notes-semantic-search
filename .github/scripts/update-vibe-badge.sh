@@ -23,6 +23,7 @@ ZED_COUNT=0
 OPENAI_COUNT=0
 BOT_COUNT=0
 RENOVATE_COUNT=0
+SEMANTIC_COUNT=0
 
 for COMMIT in $(git rev-list HEAD); do
   AUTHOR="$(git show -s --format='%an <%ae>' "$COMMIT")"
@@ -41,6 +42,11 @@ for COMMIT in $(git rev-list HEAD); do
     VIBE=$((VIBE + 1))
     IS_AI=true
     AI_TYPE="Renovate"
+  # Check for semantic-release bot commits
+  elif echo "$AUTHOR" | grep -E 'semantic-release-bot|semantic-release\[bot\]' >/dev/null; then
+    VIBE=$((VIBE + 1))
+    IS_AI=true
+    AI_TYPE="Semantic"
   # Check for other bot commits
   elif echo "$AUTHOR" | grep -F '[bot]' >/dev/null; then
     VIBE=$((VIBE + 1))
@@ -82,6 +88,7 @@ for COMMIT in $(git rev-list HEAD); do
       "OpenAI") OPENAI_COUNT=$((OPENAI_COUNT + 1)) ;;
       "Bot") BOT_COUNT=$((BOT_COUNT + 1)) ;;
       "Renovate") RENOVATE_COUNT=$((RENOVATE_COUNT + 1)) ;;
+      "Semantic") SEMANTIC_COUNT=$((SEMANTIC_COUNT + 1)) ;;
     esac
   fi
   
@@ -137,6 +144,10 @@ if [ "$RENOVATE_COUNT" -gt "$MAX_COUNT" ]; then
   MAX_COUNT="$RENOVATE_COUNT"
   LOGO="renovatebot"
 fi
+if [ "$SEMANTIC_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$SEMANTIC_COUNT"
+  LOGO="semanticrelease"
+fi
 
 # Display debug output
 if $DEBUG; then
@@ -155,6 +166,7 @@ if $DEBUG; then
   [ "$OPENAI_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "OpenAI" "$OPENAI_COUNT"
   [ "$BOT_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Bot" "$BOT_COUNT"
   [ "$RENOVATE_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Renovate" "$RENOVATE_COUNT"
+  [ "$SEMANTIC_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Semantic" "$SEMANTIC_COUNT"
   echo ""
   echo "Selected logo: $LOGO"
   echo ""
