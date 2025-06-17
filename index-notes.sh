@@ -42,8 +42,12 @@ is_note_newer() {
         return 0  # No last run, so include all notes
     fi
     
-    # Convert dates to seconds since epoch for comparison
-    local note_seconds=$(date -j -f "%Y-%m-%d %H:%M:%S" "$note_date" "+%s" 2>/dev/null || echo "0")
+    # Parse notes-app date format: "date Tuesday, 17. June 2025 at 06:39:34"
+    # Extract just the date/time portion and use date command to parse it
+    local date_part=$(echo "$note_date" | sed 's/date [^,]*, //' | sed 's/ at / /')
+    
+    # Try to convert the date to epoch seconds using date command's flexible parsing
+    local note_seconds=$(date -j -f "%d. %B %Y %H:%M:%S" "$date_part" "+%s" 2>/dev/null || echo "0")
     local last_run_seconds=$(date -j -f "%Y-%m-%d %H:%M:%S" "$last_run" "+%s" 2>/dev/null || echo "0")
     
     [[ $note_seconds -gt $last_run_seconds ]]
