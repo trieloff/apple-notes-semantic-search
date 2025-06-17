@@ -6,9 +6,13 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CONFIG_FILE="$HOME/.notes-indexer-config"
-COLLECTION_NAME="notes-memory"
-FOLDER_NAME="Memories"
+
+# Source common functions
+source "$SCRIPT_DIR/common.sh"
+init_common
+
+# Script-specific config
+INDEXER_CONFIG_FILE="$HOME/.notes-indexer-config"
 
 # Function to get current timestamp
 get_timestamp() {
@@ -17,8 +21,8 @@ get_timestamp() {
 
 # Function to read last run timestamp
 get_last_run() {
-    if [[ -f "$CONFIG_FILE" ]]; then
-        cat "$CONFIG_FILE"
+    if [[ -f "$INDEXER_CONFIG_FILE" ]]; then
+        cat "$INDEXER_CONFIG_FILE"
     else
         echo ""
     fi
@@ -26,7 +30,7 @@ get_last_run() {
 
 # Function to save current timestamp
 save_timestamp() {
-    echo "$(get_timestamp)" > "$CONFIG_FILE"
+    echo "$(get_timestamp)" > "$INDEXER_CONFIG_FILE"
 }
 
 # Function to check if a note is newer than last run
@@ -63,16 +67,7 @@ if [[ "$CONTINUE_MODE" == true ]]; then
     fi
 fi
 
-# Check if required tools are available
-if ! command -v notes-app &> /dev/null; then
-    echo "Error: notes-app command not found. Please install it first."
-    exit 1
-fi
-
-if ! command -v llm &> /dev/null; then
-    echo "Error: llm command not found. Please install it first."
-    exit 1
-fi
+# Tools are already checked in init_common
 
 echo "Starting notes indexing..."
 if [[ "$CONTINUE_MODE" == true ]]; then
@@ -130,8 +125,9 @@ Content:
 $note_content"
     
     # Store in LLM embeddings with metadata
-    echo "$combined_text" | llm embed \
-        -m text-embedding-3-large \
+    embedding_model=$(get_embedding_model)
+    echo "$combined_text" | $LLM_CMD embed \
+        -m "$embedding_model" \
         "$COLLECTION_NAME" \
         "$note_id" \
         --metadata "{\"title\":\"$note_name\",\"date\":\"$note_date\",\"folder\":\"$FOLDER_NAME\"}" \

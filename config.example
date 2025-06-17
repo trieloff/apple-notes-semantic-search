@@ -1,0 +1,22 @@
+# Example configuration file for Apple Notes semantic search
+# Copy this file to ~/.config/notes/config and modify as needed
+
+# API Keys
+# Uncomment and set the API keys you want to use
+# OPENAI_API_KEY="your-openai-api-key"
+# ANTHROPIC_API_KEY="your-anthropic-api-key"
+# GEMINI_API_KEY="your-gemini-api-key"
+
+# Model Configuration
+# Tagging model - used for generating tags when adding notes
+# Leave empty to use the default model of your LLM provider
+# Examples: gpt-4, claude-3-opus-20240229, gemini-pro
+TAGGING_MODEL=""
+
+# Embedding model - used for semantic search
+# Default: text-embedding-3-large
+EMBEDDING_MODEL="text-embedding-3-large"
+
+# Collection and Folder Names (optional)
+# COLLECTION_NAME="notes-memory"
+# FOLDER_NAME="Memories"

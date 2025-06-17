@@ -5,7 +5,13 @@
 
 set -e
 
-COLLECTION_NAME="notes-memory"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Source common functions
+source "$SCRIPT_DIR/common.sh"
+init_common
+
+# Script-specific config
 DEFAULT_LIMIT=5
 
 # Function to show usage
@@ -65,23 +71,14 @@ if ! [[ "$LIMIT" =~ ^[0-9]+$ ]] || [[ "$LIMIT" -eq 0 ]]; then
     show_usage
 fi
 
-# Check if required tools are available
-if ! command -v llm &> /dev/null; then
-    echo "Error: llm command not found. Please install it first."
-    exit 1
-fi
-
-if ! command -v notes-app &> /dev/null; then
-    echo "Error: notes-app command not found. Please install it first."
-    exit 1
-fi
+# Tools are already checked in init_common
 
 echo "Searching for: \"$QUERY\""
 echo "Limit: $LIMIT results"
 echo ""
 
 # Perform similarity search (returns JSONL format - one JSON object per line)
-search_results=$(llm similar "$COLLECTION_NAME" -c "$QUERY" -n "$LIMIT" 2>/dev/null || echo "")
+search_results=$($LLM_CMD similar "$COLLECTION_NAME" -c "$QUERY" -n "$LIMIT" 2>/dev/null || echo "")
 
 if [[ -z "$search_results" ]]; then
     echo "No results found. The collection might be empty or the query didn't match any notes."

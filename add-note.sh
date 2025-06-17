@@ -7,7 +7,10 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-FOLDER_NAME="Memories"
+
+# Source common functions
+source "$SCRIPT_DIR/common.sh"
+init_common
 
 # Function to show usage
 show_usage() {
@@ -37,7 +40,16 @@ $content
 
 Please respond with ONLY the tags, separated by spaces, with no additional text or explanation. Example response: #work #personal #planning"
     
-    echo "$prompt" | llm "$@" 2>/dev/null | head -1 | tr '\n' ' '
+    local model_args=""
+    local tagging_model=$(get_tagging_model)
+    if [[ -n "$tagging_model" ]]; then
+        model_args="-m $tagging_model"
+    fi
+    
+    # Get LLM response and extract only hashtags
+    local response=$(echo "$prompt" | $LLM_CMD $model_args "$@" 2>/dev/null | head -1)
+    # Extract only valid hashtags using regex
+    echo "$response" | grep -oE '#[a-zA-Z0-9_-]+' | tr '\n' ' '
 }
 
 # Function to add note to Apple Notes
@@ -93,16 +105,7 @@ if [[ -z "$NOTE_CONTENT" ]]; then
     show_usage
 fi
 
-# Check if required tools are available
-if ! command -v llm &> /dev/null; then
-    echo "Error: llm command not found. Please install it first."
-    exit 1
-fi
-
-if ! command -v notes-app &> /dev/null; then
-    echo "Error: notes-app command not found. Please install it first."
-    exit 1
-fi
+# Tools are already checked in init_common
 
 echo "Processing note content..."
 
@@ -126,8 +129,15 @@ if [[ ${#NOTE_TITLE} -eq 50 ]]; then
     NOTE_TITLE="${NOTE_TITLE}..."
 fi
 
-# Extract body content (everything after the first line, if any)
-NOTE_BODY=$(echo "$NOTE_CONTENT" | tail -n +2)
+# For single-line notes, use the content as body too
+# For multi-line notes, everything after the first line is body
+if [[ $(echo "$NOTE_CONTENT" | wc -l) -eq 1 ]]; then
+    # Single line - use full content as body
+    NOTE_BODY="$NOTE_CONTENT"
+else
+    # Multi-line - skip first line for body
+    NOTE_BODY=$(echo "$NOTE_CONTENT" | tail -n +2)
+fi
 
 # Convert body lines to HTML divs to preserve formatting
 if [[ -n "$NOTE_BODY" ]]; then
