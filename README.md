@@ -178,11 +178,15 @@ Weekend plans for the family
 - The system supports both local and cloud models via configuration
 ## MCP Server Setup
 
-This repository also includes `memories-mcp.sh`, a JSON-RPC server implementing the [MCP protocol](https://github.com/mcp-protocol/spec). It exposes `add` and `search` tools so editors can interact with your notes. Start the server from the repo directory:
+This repository also includes `memories-mcp.sh`, a JSON-RPC server implementing the [MCP protocol](https://github.com/mcp-protocol/spec). It exposes `add`, `search`, and `fetch` tools so editors can interact with your notes. Start the server from the repo directory:
 ```bash
 ./memories-mcp.sh
 ```
 Logs are written to `/tmp/memories-mcp-requests.log`.
+
+### OpenAI ChatGPT Deep Research Compatibility
+
+The MCP server is fully compatible with OpenAI's ChatGPT Deep Research feature. See [OPENAI_MCP_COMPLIANCE.md](./OPENAI_MCP_COMPLIANCE.md) for detailed implementation notes and requirements for building OpenAI-compatible MCP servers.
 
 ### Client Setup
 - **Claude Desktop**: Add a custom MCP server and point it to the `memories-mcp.sh` script.
@@ -190,6 +194,7 @@ Logs are written to `/tmp/memories-mcp-requests.log`.
 - **Zed**: In Preferences → AI, enable a custom MCP server and specify the script path.
 - **Cursor**: Configure the MCP command to run `memories-mcp.sh`.
 - **GitHub Co-Pilot**: Enable the experimental MCP endpoint and set it to `./memories-mcp.sh`.
+- **OpenAI ChatGPT**: Use Deep Research mode with a configured MCP server endpoint.
 
 
 ## Troubleshooting
