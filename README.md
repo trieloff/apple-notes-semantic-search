@@ -19,6 +19,7 @@ A collection of shell scripts that add semantic search capabilities to Apple Not
 - macOS with Apple Notes
 - [notes-app CLI](https://github.com/xwmx/notes-app-cli)
 - [llm CLI](https://llm.datasette.io/) with plugins
+- [jq](https://stedolan.github.io/jq/) for JSON parsing
 - Python environment (for local models)
 
 ### Special Thanks
@@ -34,6 +35,9 @@ This project wouldn't exist without these amazing tools:
 ```bash
 # Install notes-app CLI
 brew install xwmx/taps/notes-app
+
+# Install jq for JSON handling
+brew install jq
 
 # Install llm CLI (via uv for isolation)
 uv tool install llm
