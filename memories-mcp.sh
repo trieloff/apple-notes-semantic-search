@@ -79,30 +79,110 @@ add_memory() {
     fi
 }
 
-# Search memories using search-notes.sh
+# Search memories using search-notes.sh (includes full content for OpenAI compliance)
 search_memories() {
     local query="$1"
     local limit="${2:-10}"
     
-    # Check if search-notes.sh exists and is executable
-    local search_script="$SCRIPT_DIR/search-notes.sh"
-    if [[ ! -x "$search_script" ]]; then
-        jq -cn '{"error": "search-notes.sh not found or not executable"}'
-        return 1
-    fi
+    # Load common functions to get COLLECTION_NAME and LLM_CMD
+    source "$SCRIPT_DIR/common.sh"
     
-    # Call search-notes.sh and capture output
-    local output
+    # Call llm similar directly to get JSON results
+    local search_results
     local exit_code
-    output=$("$search_script" "$query" --limit "$limit" 2>&1)
+    search_results=$($LLM_CMD similar "$COLLECTION_NAME" -c "$query" -n "$limit" 2>/dev/null || echo "")
     exit_code=$?
     
-    if [[ $exit_code -eq 0 ]]; then
-        jq -cn --arg output "$output" '{"success": true, "results": $output}'
+    if [[ $exit_code -eq 0 && -n "$search_results" ]]; then
+        # Parse JSONL results and return structured data with full content
+        local results_array="[]"
+        while IFS= read -r result_json; do
+            [[ -z "$result_json" ]] && continue
+            
+            local note_id title date score content
+            note_id=$(echo "$result_json" | jq -r '.id // "unknown"')
+            title=$(echo "$result_json" | jq -r '.metadata.title // "Untitled"')
+            date=$(echo "$result_json" | jq -r '.metadata.date // "Unknown date"')
+            score=$(echo "$result_json" | jq -r '.score // "N/A"')
+            content=$(echo "$result_json" | jq -r '.content // "No content"')
+            
+            # Clean content (remove Title: ... Content: prefix if present)
+            local clean_content
+            clean_content=$(echo "$content" | sed -n '/Content:/,$p' | sed '1d')
+            if [[ -z "$clean_content" ]]; then
+                clean_content="$content"
+            fi
+            
+            # Add to results array
+            results_array=$(echo "$results_array" | jq --arg id "$note_id" --arg title "$title" --arg date "$date" --arg score "$score" --arg content "$clean_content" '. += [{"id": $id, "title": $title, "date": $date, "score": $score, "content": $content}]')
+        done <<< "$search_results"
+        
+        jq -cn --argjson results "$results_array" '{"success": true, "results": $results}'
     else
-        jq -cn --arg output "$output" '{"error": "Search failed", "details": $output}'
+        jq -cn --arg query "$query" '{"error": "Search failed or no results found", "query": $query}'
         return 1
     fi
+}
+
+# Fetch specific memory by ID
+fetch_memory() {
+    local note_id="$1"
+    
+    # Load common functions to get COLLECTION_NAME and LLM_CMD
+    source "$SCRIPT_DIR/common.sh"
+    
+    # Call llm similar to find the specific note by ID
+    local search_results
+    search_results=$($LLM_CMD similar "$COLLECTION_NAME" -c "$note_id" -n 50 2>/dev/null || echo "")
+    
+    if [[ -z "$search_results" ]]; then
+        jq -cn --arg id "$note_id" '{"error": "Note not found", "id": $id}'
+        return 1
+    fi
+    
+    # Find exact ID match
+    local found_note=""
+    while IFS= read -r result_json; do
+        [[ -z "$result_json" ]] && continue
+        
+        local current_id
+        current_id=$(echo "$result_json" | jq -r '.id // ""')
+        
+        if [[ "$current_id" == "$note_id" ]]; then
+            found_note="$result_json"
+            break
+        fi
+    done <<< "$search_results"
+    
+    if [[ -z "$found_note" ]]; then
+        jq -cn --arg id "$note_id" '{"error": "Note not found", "id": $id}'
+        return 1
+    fi
+    
+    # Extract full note details
+    local content title date score
+    content=$(echo "$found_note" | jq -r '.content // "No content"')
+    title=$(echo "$found_note" | jq -r '.metadata.title // "Untitled"')
+    date=$(echo "$found_note" | jq -r '.metadata.date // "Unknown date"')
+    score=$(echo "$found_note" | jq -r '.score // "N/A"')
+    
+    # Clean content (remove Title: ... Content: prefix if present)
+    local clean_content
+    clean_content=$(echo "$content" | sed -n '/Content:/,$p' | sed '1d')
+    if [[ -z "$clean_content" ]]; then
+        clean_content="$content"
+    fi
+    
+    jq -cn --arg id "$note_id" --arg title "$title" --arg date "$date" --arg content "$clean_content" --arg score "$score" '{
+        "success": true,
+        "note": {
+            "id": $id,
+            "title": $title,
+            "date": $date,
+            "content": $content,
+            "score": $score
+        }
+    }'
 }
 
 # Initialize response
@@ -139,17 +219,34 @@ handle_tools_list() {
                     }
                 },
                 required: ["content"]
+            },
+            outputSchema: {
+                type: "object",
+                properties: {
+                    content: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                type: { type: "string", enum: ["text"] },
+                                text: { type: "string" }
+                            },
+                            required: ["type", "text"]
+                        }
+                    }
+                },
+                required: ["content"]
             }
         },
         {
             name: "search",
-            description: "Search through your memories using semantic similarity search",
+            description: "Searches for memories using semantic similarity and returns matching results with full content",
             inputSchema: {
                 type: "object",
                 properties: {
                     query: {
                         type: "string",
-                        description: "The search query. Uses semantic similarity to find related memories."
+                        description: "Search query to find related memories."
                     },
                     limit: {
                         type: "integer",
@@ -160,6 +257,58 @@ handle_tools_list() {
                     }
                 },
                 required: ["query"]
+            },
+            outputSchema: {
+                type: "object",
+                properties: {
+                    results: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                id: { type: "string", description: "ID of the memory note." },
+                                title: { type: "string", description: "Title of the memory note." },
+                                text: { type: "string", description: "Full content of the memory note." },
+                                url: { type: ["string", "null"], description: "URL reference (always null for local notes)." }
+                            },
+                            required: ["id", "title", "text"]
+                        }
+                    }
+                },
+                required: ["results"]
+            }
+        },
+        {
+            name: "fetch",
+            description: "Fetches a specific memory by ID and returns its full content",
+            inputSchema: {
+                type: "object",
+                properties: {
+                    id: {
+                        type: "string",
+                        description: "The unique identifier of the memory to fetch"
+                    }
+                },
+                required: ["id"]
+            },
+            outputSchema: {
+                type: "object",
+                properties: {
+                    results: {
+                        type: "array",
+                        items: {
+                            type: "object",
+                            properties: {
+                                id: { type: "string", description: "ID of the memory note." },
+                                title: { type: "string", description: "Title of the memory note." },
+                                text: { type: "string", description: "Full content of the memory note." },
+                                url: { type: ["string", "null"], description: "URL reference (always null for local notes)." }
+                            },
+                            required: ["id", "title", "text"]
+                        }
+                    }
+                },
+                required: ["results"]
             }
         }
     ]')
@@ -238,34 +387,69 @@ handle_tools_call() {
             local exit_code=$?
             
             if [[ $exit_code -eq 0 ]]; then
-                # Parse success response
+                # Parse success response and transform to required format
                 local search_results
-                search_results=$(echo "$result" | jq -r '.results // ""')
+                search_results=$(echo "$result" | jq -r '.results')
                 
-                local content_text="🔍 Search results for: $query\n\n$search_results"
+                # Transform results to match OpenAI schema (id, title, text, url)
+                local transformed_results
+                transformed_results=$(echo "$search_results" | jq 'map({
+                    id: .id,
+                    title: .title,
+                    text: .content,
+                    url: null
+                })')
                 
                 local mcp_result
-                mcp_result=$(jq -cn --arg text "$content_text" '{
-                    content: [
-                        {
-                            type: "text",
-                            text: $text
-                        }
-                    ]
+                mcp_result=$(jq -cn --argjson results "$transformed_results" '{
+                    results: $results
                 }')
                 success_response "$id" "$mcp_result"
             else
                 # Parse error response
-                local error_msg details
+                local error_msg
                 error_msg=$(echo "$result" | jq -r '.error // "Search failed"')
-                details=$(echo "$result" | jq -r '.details // ""')
+                error_response "$id" -32603 "$error_msg"
+            fi
+            ;;
+            
+        "fetch")
+            local fetch_id
+            fetch_id=$(echo "$arguments" | jq -r '.id // empty')
+            
+            if [[ -z "$fetch_id" ]]; then
+                error_response "$id" -32602 "Missing required parameter: id"
+                return
+            fi
+            
+            local result
+            result=$(fetch_memory "$fetch_id")
+            local exit_code=$?
+            
+            if [[ $exit_code -eq 0 ]]; then
+                # Parse success response and transform to required format
+                local note_data
+                note_data=$(echo "$result" | jq -r '.note')
                 
-                local full_error="$error_msg"
-                if [[ -n "$details" ]]; then
-                    full_error="$full_error: $details"
-                fi
+                # Transform to match OpenAI schema (return as single-item array)
+                local transformed_result
+                transformed_result=$(echo "$note_data" | jq '{
+                    id: .id,
+                    title: .title, 
+                    text: .content,
+                    url: null
+                }')
                 
-                error_response "$id" -32603 "$full_error"
+                local mcp_result
+                mcp_result=$(jq -cn --argjson result "$transformed_result" '{
+                    results: [$result]
+                }')
+                success_response "$id" "$mcp_result"
+            else
+                # Parse error response
+                local error_msg
+                error_msg=$(echo "$result" | jq -r '.error // "Fetch failed"')
+                error_response "$id" -32603 "$error_msg"
             fi
             ;;
             
@@ -305,6 +489,14 @@ main() {
                 tool_name=$(echo "$params" | jq -r '.name // empty')
                 arguments=$(echo "$params" | jq '.arguments // {}')
                 handle_tools_call "$id" "$tool_name" "$arguments"
+                ;;
+            "resources/list")
+                # Return empty resources list for OpenAI compatibility
+                success_response "$id" '{"resources": []}'
+                ;;
+            "prompts/list")
+                # Return empty prompts list for OpenAI compatibility  
+                success_response "$id" '{"prompts": []}'
                 ;;
             "notifications/initialized")
                 # Ignore this notification
