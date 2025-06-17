@@ -6,8 +6,12 @@ VIBE=0
 for COMMIT in $(git rev-list HEAD); do
   AUTHOR="$(git show -s --format='%an <%ae>' "$COMMIT")"
   BODY="$(git show -s --format='%B' "$COMMIT")"
-  if echo "$AUTHOR" | grep -iE 'claude|codex|cursor|zed|windsurf|openai' >/dev/null \
-     || echo "$BODY" | grep -iE '🤖|generated with|co-?authored-?by:.*(claude|codex|cursor|zed|windsurf|openai)|signed-off-by:.*(claude|codex|cursor|zed|windsurf|openai)' >/dev/null; then
+  # Check for AI-generated commits by author or message content
+  if echo "$AUTHOR" | grep -iE 'claude|cursor|zed|windsurf|openai' >/dev/null \
+     || echo "$BODY" | grep -iE '🤖|generated with|co-?authored-?by:.*(claude|cursor|zed|windsurf|openai)|signed-off-by:.*(claude|cursor|zed|windsurf|openai)' >/dev/null; then
+    VIBE=$((VIBE + 1))
+  # Check for Codex commits (merge commits from codex branches)
+  elif echo "$BODY" | grep -E '^Merge pull request .* from .*/.*codex/.*' >/dev/null; then
     VIBE=$((VIBE + 1))
   fi
 done
