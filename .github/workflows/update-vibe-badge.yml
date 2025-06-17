@@ -4,6 +4,10 @@ on:
   push:
     branches: ["**"]
 
+permissions:
+  contents: write
+
+
 jobs:
   update:
     if: "!contains(github.event.head_commit.message, '[skip vibe-badge]')"
