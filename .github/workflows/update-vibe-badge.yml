@@ -1,0 +1,25 @@
+name: Update Vibe Badge
+
+on:
+  push:
+    branches: ["**"]
+
+jobs:
+  update:
+    if: "!contains(github.event.head_commit.message, '[skip vibe-badge]')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Update badge
+        run: |
+          bash scripts/update-vibe-badge.sh
+      - name: Push changes
+        run: |
+          if [ -f /tmp/badge_changed ]; then
+            git push
+          else
+            echo "No changes to push"
+          fi
