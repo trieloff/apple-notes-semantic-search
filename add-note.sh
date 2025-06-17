@@ -52,6 +52,43 @@ Please respond with ONLY the tags, separated by spaces, with no additional text 
     echo "$response" | grep -oE '#[a-zA-Z0-9_-]+' | tr '\n' ' '
 }
 
+# Function to generate a concise title using LLM
+generate_title() {
+    local content="$1"
+    
+    local prompt="Please create a concise, descriptive title for the following note content. The title should:
+- Be maximum 40 characters long
+- Capture the main topic/idea
+- Be clear and searchable
+- NOT include quotes or special characters
+- Be a short phrase, not a full sentence
+
+Note content:
+$content
+
+Respond with ONLY the title, no quotes, no explanations."
+    
+    local model_args=""
+    local tagging_model=$(get_tagging_model)
+    if [[ -n "$tagging_model" ]]; then
+        model_args="-m $tagging_model"
+    fi
+    
+    # Get LLM response and clean it up thoroughly
+    local response=$(echo "$prompt" | $LLM_CMD $model_args "$@" 2>/dev/null | head -1)
+    # Extract first line and clean up LLM artifacts
+    response=$(echo "$response" | sed 's/<|.*|>.*//g' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | sed 's/^"//; s/"$//')
+    # Get just the first part before any explanations
+    response=$(echo "$response" | cut -d'<' -f1 | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')
+    
+    # Ensure it's not too long, fallback to truncation if needed
+    if [[ ${#response} -gt 40 ]] || [[ -z "$response" ]]; then
+        echo "$(echo "$content" | head -1 | cut -c1-37 | sed 's/[[:space:]]*$//')..."
+    else
+        echo "$response"
+    fi
+}
+
 # Function to add note to Apple Notes
 add_to_notes() {
     local title="$1"
@@ -123,11 +160,9 @@ TAGS=$(echo "$TAGS" | xargs)
 
 echo "Generated tags: $TAGS"
 
-# Generate a title from the first line or first few words
-NOTE_TITLE=$(echo "$NOTE_CONTENT" | head -1 | cut -c1-50)
-if [[ ${#NOTE_TITLE} -eq 50 ]]; then
-    NOTE_TITLE="${NOTE_TITLE}..."
-fi
+# Generate a concise title using LLM
+echo "Generating title..."
+NOTE_TITLE=$(generate_title "$NOTE_CONTENT")
 
 # For single-line notes, use the content as body too
 # For multi-line notes, everything after the first line is body
