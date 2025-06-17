@@ -14,6 +14,15 @@ VIBE=0
 declare -a AI_COMMITS=()
 declare -a HUMAN_COMMITS=()
 
+# Counters for each AI type
+CLAUDE_COUNT=0
+CODEX_COUNT=0
+WINDSURF_COUNT=0
+CURSOR_COUNT=0
+ZED_COUNT=0
+OPENAI_COUNT=0
+BOT_COUNT=0
+
 for COMMIT in $(git rev-list HEAD); do
   AUTHOR="$(git show -s --format='%an <%ae>' "$COMMIT")"
   BODY="$(git show -s --format='%B' "$COMMIT")"
@@ -56,6 +65,19 @@ for COMMIT in $(git rev-list HEAD); do
     AI_TYPE="Codex"
   fi
   
+  # Count AI commits by type
+  if $IS_AI && [ -n "$AI_TYPE" ]; then
+    case "$AI_TYPE" in
+      "Claude") CLAUDE_COUNT=$((CLAUDE_COUNT + 1)) ;;
+      "Codex") CODEX_COUNT=$((CODEX_COUNT + 1)) ;;
+      "Windsurf") WINDSURF_COUNT=$((WINDSURF_COUNT + 1)) ;;
+      "Cursor") CURSOR_COUNT=$((CURSOR_COUNT + 1)) ;;
+      "Zed") ZED_COUNT=$((ZED_COUNT + 1)) ;;
+      "OpenAI") OPENAI_COUNT=$((OPENAI_COUNT + 1)) ;;
+      "Bot") BOT_COUNT=$((BOT_COUNT + 1)) ;;
+    esac
+  fi
+  
   if $DEBUG; then
     if $IS_AI; then
       AI_COMMITS+=("$(printf "%-7s | %-10s | %-40.40s | %s" "$COMMIT" "$AI_TYPE" "$SUBJECT" "$DATE")")
@@ -71,6 +93,40 @@ else
   PERCENT=$((100 * VIBE / TOTAL))
 fi
 
+# Determine which logo to use based on most common AI type
+LOGO="githubcopilot"  # default
+MAX_COUNT=0
+
+# Check each AI type
+if [ "$CLAUDE_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$CLAUDE_COUNT"
+  LOGO="claude"
+fi
+if [ "$CODEX_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$CODEX_COUNT"
+  LOGO="openai"
+fi
+if [ "$WINDSURF_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$WINDSURF_COUNT"
+  LOGO="windsurf"
+fi
+if [ "$CURSOR_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$CURSOR_COUNT"
+  LOGO="githubcopilot"
+fi
+if [ "$ZED_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$ZED_COUNT"
+  LOGO="githubcopilot"
+fi
+if [ "$OPENAI_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$OPENAI_COUNT"
+  LOGO="openai"
+fi
+if [ "$BOT_COUNT" -gt "$MAX_COUNT" ]; then
+  MAX_COUNT="$BOT_COUNT"
+  LOGO="githubcopilot"
+fi
+
 # Display debug output
 if $DEBUG; then
   echo "=== Vibe Badge Debug Mode ==="
@@ -78,6 +134,17 @@ if $DEBUG; then
   echo ""
   echo "AI-generated commits: $VIBE (${PERCENT}%)"
   echo "Human commits: $((TOTAL - VIBE)) ($((100 - PERCENT))%)"
+  echo ""
+  echo "AI Breakdown:"
+  [ "$CLAUDE_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Claude" "$CLAUDE_COUNT"
+  [ "$CODEX_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Codex" "$CODEX_COUNT"
+  [ "$WINDSURF_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Windsurf" "$WINDSURF_COUNT"
+  [ "$CURSOR_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Cursor" "$CURSOR_COUNT"
+  [ "$ZED_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Zed" "$ZED_COUNT"
+  [ "$OPENAI_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "OpenAI" "$OPENAI_COUNT"
+  [ "$BOT_COUNT" -gt 0 ] && printf "  %-10s: %d\n" "Bot" "$BOT_COUNT"
+  echo ""
+  echo "Selected logo: $LOGO"
   echo ""
   echo "AI Commits:"
   echo "-----------"
@@ -103,10 +170,10 @@ fi
 
 # Only update badge if not in debug mode
 if ! $DEBUG; then
-  NEW_BADGE="[![${PERCENT}% Vibe Coded](https://img.shields.io/badge/${PERCENT}%25-Vibe_Coded-ff69b4?style=for-the-badge&logo=headphones&logoColor=white)](https://github.com/trieloff/apple-notes-semantic-search)"
+  NEW_BADGE="[![${PERCENT}% Vibe Coded](https://img.shields.io/badge/${PERCENT}%25-Vibe_Coded-ff69b4?style=for-the-badge&logo=${LOGO}&logoColor=white)](https://github.com/trieloff/apple-notes-semantic-search)"
   ESC_BADGE=$(printf '%s\n' "$NEW_BADGE" | sed 's/[#&]/\\&/g')
 
-  perl -0pi -e "s#\[!\[\d+% Vibe Coded\]\(https://img.shields.io/badge/\d+%25-Vibe_Coded-ff69b4\?style=for-the-badge&logo=headphones&logoColor=white\)\]\(https://github.com/trieloff/apple-notes-semantic-search\)#$ESC_BADGE#" README.md
+  perl -0pi -e "s#\[!\[\d+% Vibe Coded\]\(https://img.shields.io/badge/\d+%25-Vibe_Coded-ff69b4\?style=for-the-badge&logo=[^&]*&logoColor=white\)\]\(https://github.com/trieloff/apple-notes-semantic-search\)#$ESC_BADGE#" README.md
 
   if ! git diff --quiet README.md; then
     git config user.name 'github-actions[bot]'
