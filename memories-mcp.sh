@@ -182,7 +182,7 @@ handle_initialize() {
     local id="$1"
     local response
     response=$(jq -cn '{
-        protocolVersion: "2024-11-05",
+        protocolVersion: "2025-03-26",
         serverInfo: {
             name: "memories-mcp",
             version: "1.0.0"
@@ -469,6 +469,9 @@ main() {
                 ;;
             "notifications/initialized")
                 # Ignore this notification
+                ;;
+            "notifications/cancelled")
+                # Ignore this notification (request cancelled)
                 ;;
             *)
                 error_response "$id" -32601 "Method not found: $method"
