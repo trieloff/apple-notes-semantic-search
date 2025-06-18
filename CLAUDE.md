@@ -25,3 +25,10 @@
 - Collection name: notes-memory
 - Always use --store flag with llm embed to store content
 - llm similar returns JSONL format (one JSON object per line)
+
+## MCP Server Testing
+- Best approach: Use echo, pipe, timeout, and jq for testing MCP commands
+- Example: `{ echo '{"jsonrpc":"2.0","id":0,"method":"initialize"...}'; echo '{"jsonrpc":"2.0","id":1,"method":"tools/call"...}'; } | timeout 10 ./memories-mcp.sh | jq`
+- Avoid HTTP endpoints - they require persistent SSE sessions which are harder to maintain
+- Using the bash script directly doesn't require server restarts between tests
+- For production restarts, use the mcpctl command (not pkill or manual restarts)

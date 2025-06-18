@@ -164,7 +164,13 @@ fetch_memory() {
     local creation_date="${lines[3]:-}"
     local modification_date="${lines[4]:-}"
     local title="${lines[5]:-Untitled}"
-    local body="${lines[6]:-}"
+    
+    # Body starts at line 7 (index 6) and includes all remaining lines
+    local body=""
+    if [[ ${#lines[@]} -gt 6 ]]; then
+        # Join all lines from index 6 onwards with newlines
+        body=$(printf '%s\n' "${lines[@]:6}" | sed '$ s/$//')  # Remove trailing newline
+    fi
     
     # Format response for both Claude (content) and ChatGPT (results) compatibility
     local content_text="Title: $title\nCreated: $creation_date\nModified: $modification_date\n\n$body"
