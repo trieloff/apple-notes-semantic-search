@@ -30,9 +30,9 @@ error_response() {
     local code="$2"
     local message="$3"
     local response
-    response=$(jq -cn --argjson id "$id" --argjson code "$code" --arg message "$message" '{
+    response=$(jq -cn --arg id "$id" --argjson code "$code" --arg message "$message" '{
         jsonrpc: "2.0",
-        id: $id,
+        id: ($id | if . == "null" then null else try tonumber catch . end),
         error: {
             code: $code,
             message: $message
@@ -46,9 +46,9 @@ success_response() {
     local id="$1"
     local result="$2"
     local response
-    response=$(jq -cn --argjson id "$id" --arg result "$result" '{
+    response=$(jq -cn --arg id "$id" --arg result "$result" '{
         jsonrpc: "2.0",
-        id: $id,
+        id: ($id | if . == "null" then null else try tonumber catch . end),
         result: ($result | fromjson)
     }')
     send_response "$response"
