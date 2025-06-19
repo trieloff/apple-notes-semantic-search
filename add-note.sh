@@ -96,7 +96,12 @@ add_to_notes() {
     
     # Use notes-app to create a new note in the Memories folder
     # Match the format of "Remember this" note exactly
-    notes-app add "$title" --folder "$FOLDER_NAME" --body "$content" 2>/dev/null
+    
+    # Escape quotes in content to prevent AppleScript syntax errors
+    local escaped_content="${content//\"/\\\"}"
+    local escaped_title="${title//\"/\\\"}"
+    
+    notes-app add "$escaped_title" --folder "$FOLDER_NAME" --body "$escaped_content" 2>/dev/null
 }
 
 # Function to trigger reindex in background
