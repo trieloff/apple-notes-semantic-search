@@ -17,4 +17,4 @@ jobs:
         with:
           fetch-depth: 0
       - name: Update Vibe Coded Badge
-        uses: trieloff/vibe-coded-badge-action@v1
+        uses: trieloff/vibe-coded-badge-action@main
