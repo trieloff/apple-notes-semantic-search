@@ -283,7 +283,7 @@ handle_tools_list() {
         },
         {
             name: "fetch",
-            description: "Fetches a specific memory by URL and returns its full content. Use the exact URL from search results.",
+            description: "Fetches a specific memory by URL and returns its full content. Use the exact URL from search results. Note: This tool does not need to be called after a search as no additional content will be retrieved",
             inputSchema: {
                 type: "object",
                 properties: {
